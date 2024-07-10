@@ -11,14 +11,19 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import com.example.camapp.ui.theme.CamAppTheme
 
 class MainActivity : ComponentActivity() {
+    private var server: CameraHttpServer? = null
     private var serverStatus by mutableStateOf("Server not started")
     private var serverIp by mutableStateOf("")
+    private var cameraEnabled by mutableStateOf(true)
+    private var serverEnabled by mutableStateOf(false)
+    private var audioEnabled by mutableStateOf(false) // Flag for AudioService
     private var frameRate by mutableStateOf(30) // Default frame rate
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -32,7 +37,22 @@ class MainActivity : ComponentActivity() {
                             CameraView(
                                 serverStatus = serverStatus,
                                 serverIp = serverIp,
+                                cameraEnabled = cameraEnabled,
+                                serverEnabled = serverEnabled,
+                                audioEnabled = audioEnabled,
                                 frameRate = frameRate,
+                                onCameraToggle = { enabled ->
+                                    cameraEnabled = enabled
+                                    updateCameraState(enabled)
+                                },
+                                onServerToggle = { enabled ->
+                                    serverEnabled = enabled
+                                    updateServerState(enabled)
+                                },
+                                onAudioToggle = { enabled ->
+                                    audioEnabled = enabled
+                                    updateAudioState(enabled)
+                                },
                                 onFrameRateChange = { newFrameRate ->
                                     frameRate = newFrameRate
                                     updateFrameRate(newFrameRate)
@@ -51,7 +71,9 @@ class MainActivity : ComponentActivity() {
         val requestPermissionLauncher =
             registerForActivityResult(ActivityResultContracts.RequestPermission()) { isGranted: Boolean ->
                 if (isGranted) {
-                    startCameraService()
+                    if (serverEnabled) startServer()
+                    if (cameraEnabled) startCameraService()
+                    if (audioEnabled) startAudioService()
                 } else {
                     // Handle permission denied case
                 }
@@ -62,7 +84,9 @@ class MainActivity : ComponentActivity() {
                 this,
                 Manifest.permission.CAMERA
             ) == PackageManager.PERMISSION_GRANTED -> {
-                startCameraService()
+                if (serverEnabled) startServer()
+                if (cameraEnabled) startCameraService()
+                if (audioEnabled) startAudioService()
             }
             else -> {
                 requestPermissionLauncher.launch(Manifest.permission.CAMERA)
@@ -70,12 +94,71 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    private fun startServer() {
+        server = CameraHttpServer(this)
+        try {
+            server?.start()
+            serverStatus = "Server started"
+            serverIp = "http://${getLocalIpAddress()}:8080"
+        } catch (e: Exception) {
+            serverStatus = "Server failed to start: ${e.message}"
+        }
+    }
+
+    private fun stopServer() {
+        server?.stop()
+        serverStatus = "Server stopped"
+        serverIp = ""
+        server = null
+    }
+
     private fun startCameraService() {
         val serviceIntent = Intent(this, CameraService::class.java)
         serviceIntent.putExtra("frameRate", frameRate)
         ContextCompat.startForegroundService(this, serviceIntent)
-        serverStatus = "Server started"
-        serverIp = "http://${getLocalIpAddress()}:8080"
+    }
+
+    private fun stopCameraService() {
+        val serviceIntent = Intent(this, CameraService::class.java)
+        stopService(serviceIntent)
+    }
+
+    private fun startAudioService() {
+        val serviceIntent = Intent(this, AudioService::class.java)
+        ContextCompat.startForegroundService(this, serviceIntent)
+    }
+
+    private fun stopAudioService() {
+        val serviceIntent = Intent(this, AudioService::class.java)
+        stopService(serviceIntent)
+    }
+
+    private fun updateCameraState(enabled: Boolean) {
+        if (enabled) {
+            if (serverEnabled) startCameraService()
+        } else {
+            stopCameraService()
+        }
+    }
+
+    private fun updateServerState(enabled: Boolean) {
+        serverEnabled = enabled
+        if (enabled && cameraEnabled) {
+            startServer()
+            startCameraService()
+        } else {
+            stopServer()
+            stopCameraService()
+        }
+    }
+
+    private fun updateAudioState(enabled: Boolean) {
+        audioEnabled = enabled
+        if (enabled) {
+            startAudioService()
+        } else {
+            stopAudioService()
+        }
     }
 
     private fun updateFrameRate(newFrameRate: Int) {
@@ -86,9 +169,9 @@ class MainActivity : ComponentActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
-        val serviceIntent = Intent(this, CameraService::class.java)
-        stopService(serviceIntent)
-        serverStatus = "Server stopped"
+        stopServer()
+        stopCameraService()
+        stopAudioService()
     }
 }
 
@@ -96,7 +179,13 @@ class MainActivity : ComponentActivity() {
 fun CameraView(
     serverStatus: String,
     serverIp: String,
+    cameraEnabled: Boolean,
+    serverEnabled: Boolean,
+    audioEnabled: Boolean, // Added audioEnabled state
     frameRate: Int,
+    onCameraToggle: (Boolean) -> Unit,
+    onServerToggle: (Boolean) -> Unit,
+    onAudioToggle: (Boolean) -> Unit, // Added onAudioToggle callback
     onFrameRateChange: (Int) -> Unit
 ) {
     var sliderPosition by remember { mutableStateOf(frameRate.toFloat()) }
@@ -109,6 +198,33 @@ fun CameraView(
         Text(text = serverStatus)
         Spacer(modifier = Modifier.height(8.dp))
         Text(text = serverIp)
+        Spacer(modifier = Modifier.height(16.dp))
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Switch(
+                checked = cameraEnabled,
+                onCheckedChange = { onCameraToggle(it) },
+                modifier = Modifier.padding(end = 8.dp)
+            )
+            Text(text = "Camera Enabled")
+        }
+        Spacer(modifier = Modifier.height(8.dp))
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Switch(
+                checked = serverEnabled,
+                onCheckedChange = { onServerToggle(it) },
+                modifier = Modifier.padding(end = 8.dp)
+            )
+            Text(text = "Server Enabled")
+        }
+        Spacer(modifier = Modifier.height(8.dp))
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Switch(
+                checked = audioEnabled,
+                onCheckedChange = { onAudioToggle(it) },
+                modifier = Modifier.padding(end = 8.dp)
+            )
+            Text(text = "Audio Enabled")
+        }
         Spacer(modifier = Modifier.height(16.dp))
         Text(text = "Frame Rate: ${sliderPosition.toInt()} FPS")
         Slider(
