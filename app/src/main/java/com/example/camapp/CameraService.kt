@@ -3,7 +3,6 @@ package com.example.camapp
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
-import android.content.Context
 import android.content.Intent
 import android.os.Build
 import android.os.IBinder
@@ -17,11 +16,18 @@ import java.util.concurrent.Executors
 class CameraService : LifecycleService() {
     private var server: CameraHttpServer? = null
     private val cameraExecutor = Executors.newSingleThreadExecutor()
+    private var frameRate = 30 // Default frame rate
 
     override fun onCreate() {
         super.onCreate()
         startForegroundService()
         startCamera()
+    }
+
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        frameRate = intent?.getIntExtra("frameRate", 30) ?: 30
+        server?.setFrameRate(frameRate)
+        return super.onStartCommand(intent, flags, startId)
     }
 
     private fun startForegroundService() {
@@ -70,7 +76,7 @@ class CameraService : LifecycleService() {
             }
         }, ContextCompat.getMainExecutor(this))
 
-        server = CameraHttpServer(this)
+        server = CameraHttpServer(this, frameRate)
         server?.start()
     }
 

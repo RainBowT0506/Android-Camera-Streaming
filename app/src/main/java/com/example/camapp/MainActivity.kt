@@ -9,8 +9,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
+import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -20,6 +19,7 @@ import com.example.camapp.ui.theme.CamAppTheme
 class MainActivity : ComponentActivity() {
     private var serverStatus by mutableStateOf("Server not started")
     private var serverIp by mutableStateOf("")
+    private var frameRate by mutableStateOf(30) // Default frame rate
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -29,7 +29,15 @@ class MainActivity : ComponentActivity() {
                 Scaffold(
                     content = { padding ->
                         Box(modifier = Modifier.padding(padding)) {
-                            CameraView(serverStatus, serverIp)
+                            CameraView(
+                                serverStatus = serverStatus,
+                                serverIp = serverIp,
+                                frameRate = frameRate,
+                                onFrameRateChange = { newFrameRate ->
+                                    frameRate = newFrameRate
+                                    updateFrameRate(newFrameRate)
+                                }
+                            )
                         }
                     }
                 )
@@ -64,9 +72,16 @@ class MainActivity : ComponentActivity() {
 
     private fun startCameraService() {
         val serviceIntent = Intent(this, CameraService::class.java)
+        serviceIntent.putExtra("frameRate", frameRate)
         ContextCompat.startForegroundService(this, serviceIntent)
         serverStatus = "Server started"
         serverIp = "http://${getLocalIpAddress()}:8080"
+    }
+
+    private fun updateFrameRate(newFrameRate: Int) {
+        val serviceIntent = Intent(this, CameraService::class.java)
+        serviceIntent.putExtra("frameRate", newFrameRate)
+        ContextCompat.startForegroundService(this, serviceIntent)
     }
 
     override fun onDestroy() {
@@ -78,7 +93,14 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-fun CameraView(serverStatus: String, serverIp: String) {
+fun CameraView(
+    serverStatus: String,
+    serverIp: String,
+    frameRate: Int,
+    onFrameRateChange: (Int) -> Unit
+) {
+    var sliderPosition by remember { mutableStateOf(frameRate.toFloat()) }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -87,6 +109,17 @@ fun CameraView(serverStatus: String, serverIp: String) {
         Text(text = serverStatus)
         Spacer(modifier = Modifier.height(8.dp))
         Text(text = serverIp)
+        Spacer(modifier = Modifier.height(16.dp))
+        Text(text = "Frame Rate: ${sliderPosition.toInt()} FPS")
+        Slider(
+            value = sliderPosition,
+            onValueChange = {
+                sliderPosition = it
+                onFrameRateChange(it.toInt())
+            },
+            valueRange = 1f..60f,
+            steps = 59 // Number of steps between min and max values
+        )
     }
 }
 
