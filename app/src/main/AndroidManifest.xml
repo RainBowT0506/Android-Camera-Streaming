@@ -6,6 +6,7 @@
         android:required="true" />
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-permission android:name="android.permission.INTERNET"/>
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CAMERA" />
     <application
 
         android:allowBackup="true"
@@ -17,7 +18,8 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.CamApp"
         tools:targetApi="31" >
-
+        <service android:name=".CameraService"
+            android:foregroundServiceType="camera" />
         <activity
             android:name=".MainActivity"
             android:exported="true"
