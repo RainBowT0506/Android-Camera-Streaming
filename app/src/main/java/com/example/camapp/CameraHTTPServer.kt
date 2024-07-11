@@ -1,9 +1,8 @@
 package com.example.camapp
 
 import android.content.Context
+import android.util.Base64
 import fi.iki.elonen.NanoHTTPD
-import java.io.ByteArrayInputStream
-import java.io.InputStream
 import java.util.concurrent.BlockingQueue
 import java.util.concurrent.LinkedBlockingQueue
 
@@ -36,9 +35,20 @@ private val INDEX_HTML = """
         var audioSource = new EventSource('/audio');
 
         audioSource.onmessage = function(event) {
-            var blob = new Blob([event.data], { type: 'audio/ogg; codecs=opus' });
+            var audioData = event.data;
+
+            // Convert received ArrayBuffer to Blob
+            var blob = new Blob([audioData], { type: 'audio/mp4' });
+
+            // Create object URL from Blob
             var url = URL.createObjectURL(blob);
+
+            // Set the audio element's source to the created URL
             audioPlayer.src = url;
+        };
+
+        audioSource.onerror = function(event) {
+            console.error("EventSource error:", event);
         };
     </script>
 </body>
@@ -103,14 +113,16 @@ class CameraHttpServer(private val context: Context) : NanoHTTPD(8080) {
             }
             "/audio" -> {
                 val headers = mutableMapOf<String, String>()
-                headers["Content-Type"] = "audio/ogg; codecs=opus"
+                headers["Content-Type"] = "audio/mp4"
                 val audioData = AudioDataHolder.getAudioData()
-                if (audioData != null) {
-                    newChunkedResponse(Response.Status.OK, "audio/ogg; codecs=opus", ByteArrayInputStream(audioData)).apply {
-                        headers.forEach { (key, value) ->
-                            addHeader(key, value)
+                return if (audioData != null) {
+                    val base64Data = Base64.encodeToString(audioData, Base64.DEFAULT)
+                    newFixedLengthResponse(Response.Status.OK, "audio/mp4", base64Data)
+                        .apply {
+                            headers.forEach { (key, value) ->
+                                addHeader(key, value)
+                            }
                         }
-                    }
                 } else {
                     newFixedLengthResponse(Response.Status.NOT_FOUND, NanoHTTPD.MIME_PLAINTEXT, "No audio data available")
                 }

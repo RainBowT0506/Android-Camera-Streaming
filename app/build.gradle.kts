@@ -50,6 +50,7 @@ android {
 }
 
 dependencies {
+    implementation("io.getstream:stream-webrtc-android:1.1.3")
     implementation("org.nanohttpd:nanohttpd:2.3.1")
     implementation(libs.androidx.core.ktx)
     implementation("androidx.lifecycle:lifecycle-service:2.4.0")
