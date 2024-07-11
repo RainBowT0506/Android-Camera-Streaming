@@ -1,5 +1,6 @@
 package com.example.camapp
 
+import android.Manifest
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -7,17 +8,15 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.media.AudioFormat
 import android.media.AudioRecord
-import android.media.MediaRecorder
 import android.media.MediaCodec
 import android.media.MediaCodecInfo
 import android.media.MediaFormat
+import android.media.MediaRecorder
 import android.os.Build
 import android.os.IBinder
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.LifecycleService
-import java.io.ByteArrayOutputStream
-import android.Manifest
 import java.nio.ByteBuffer
 import java.util.concurrent.Executors
 
@@ -30,7 +29,6 @@ class AudioService : LifecycleService() {
         AudioFormat.CHANNEL_IN_MONO,
         AudioFormat.ENCODING_PCM_16BIT
     )
-    private val audioDataBuffer = ByteArrayOutputStream()
     private val audioExecutor = Executors.newSingleThreadExecutor()
     private val channelId = "AudioServiceChannel"
 
@@ -118,7 +116,6 @@ class AudioService : LifecycleService() {
         audioThread.interrupt()
         audioRecorder.stop()
         audioRecorder.release()
-        audioDataBuffer.close()
 
         // Release AAC encoder
         releaseAACEncoder()

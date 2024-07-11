@@ -1,8 +1,8 @@
 package com.example.camapp
 
 import android.content.Context
-import android.util.Base64
 import fi.iki.elonen.NanoHTTPD
+import java.io.ByteArrayInputStream
 import java.util.concurrent.BlockingQueue
 import java.util.concurrent.LinkedBlockingQueue
 
@@ -32,24 +32,7 @@ private val INDEX_HTML = """
     <audio id="audioPlayer" controls autoplay></audio>
     <script>
         var audioPlayer = document.getElementById('audioPlayer');
-        var audioSource = new EventSource('/audio');
-
-        audioSource.onmessage = function(event) {
-            var audioData = event.data;
-
-            // Convert received ArrayBuffer to Blob
-            var blob = new Blob([audioData], { type: 'audio/mp4' });
-
-            // Create object URL from Blob
-            var url = URL.createObjectURL(blob);
-
-            // Set the audio element's source to the created URL
-            audioPlayer.src = url;
-        };
-
-        audioSource.onerror = function(event) {
-            console.error("EventSource error:", event);
-        };
+        audioPlayer.src = "/audio"; // Set the audio source directly to /audio endpoint
     </script>
 </body>
 </html>
@@ -113,16 +96,15 @@ class CameraHttpServer(private val context: Context) : NanoHTTPD(8080) {
             }
             "/audio" -> {
                 val headers = mutableMapOf<String, String>()
-                headers["Content-Type"] = "audio/mp4"
+                headers["Content-Type"] = "audio/aac"
                 val audioData = AudioDataHolder.getAudioData()
-                return if (audioData != null) {
-                    val base64Data = Base64.encodeToString(audioData, Base64.DEFAULT)
-                    newFixedLengthResponse(Response.Status.OK, "audio/mp4", base64Data)
-                        .apply {
-                            headers.forEach { (key, value) ->
-                                addHeader(key, value)
-                            }
+                if (audioData != null) {
+                    val inputStream = ByteArrayInputStream(audioData)
+                    newChunkedResponse(Response.Status.OK, "audio/aac", inputStream).apply {
+                        headers.forEach { (key, value) ->
+                            addHeader(key, value)
                         }
+                    }
                 } else {
                     newFixedLengthResponse(Response.Status.NOT_FOUND, NanoHTTPD.MIME_PLAINTEXT, "No audio data available")
                 }
