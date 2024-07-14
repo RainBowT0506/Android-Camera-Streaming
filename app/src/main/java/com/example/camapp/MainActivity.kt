@@ -28,7 +28,6 @@ class MainActivity : ComponentActivity() {
     private var cameraEnabled by mutableStateOf(false)
     private var serverEnabled by mutableStateOf(true)
     private var audioEnabled by mutableStateOf(false) // Flag for AudioService
-    private var frameRate by mutableStateOf(10) // Default frame rate
     private var cameraServiceConnection: ServiceConnection? = null
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -44,7 +43,6 @@ class MainActivity : ComponentActivity() {
                                 serverEnabled = serverEnabled,
                                 cameraEnabled = cameraEnabled,
                                 audioEnabled = audioEnabled,
-                                frameRate = frameRate,
                                 onCameraToggle = { enabled ->
                                     cameraEnabled = enabled
                                     updateCameraState(enabled)
@@ -57,10 +55,6 @@ class MainActivity : ComponentActivity() {
                                     audioEnabled = enabled
                                     updateAudioState(enabled)
                                 },
-                                onFrameRateChange = { newFrameRate ->
-                                    frameRate = newFrameRate
-                                    updateFrameRate(newFrameRate)
-                                }
                             )
                         }
                     }
@@ -120,8 +114,6 @@ class MainActivity : ComponentActivity() {
 
     private fun startCameraService() {
         val serviceIntent = Intent(this, CameraService::class.java)
-        serviceIntent.putExtra("frameRate", frameRate)
-        serviceIntent.putExtra("zoomLevel", 0f)
         ContextCompat.startForegroundService(this, serviceIntent)
         bindCameraService()
     }
@@ -188,12 +180,6 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private fun updateFrameRate(newFrameRate: Int) {
-        val serviceIntent = Intent(this, CameraService::class.java)
-        serviceIntent.putExtra("frameRate", newFrameRate)
-        ContextCompat.startForegroundService(this, serviceIntent)
-    }
-
     override fun onDestroy() {
         super.onDestroy()
         stopServer()
@@ -206,15 +192,11 @@ fun CameraView(
     serverIp: String,
     cameraEnabled: Boolean,
     serverEnabled: Boolean,
-    audioEnabled: Boolean, // Added audioEnabled state
-    frameRate: Int,
+    audioEnabled: Boolean,
     onCameraToggle: (Boolean) -> Unit,
     onServerToggle: (Boolean) -> Unit,
-    onAudioToggle: (Boolean) -> Unit, // Added onAudioToggle callback
-    onFrameRateChange: (Int) -> Unit
+    onAudioToggle: (Boolean) -> Unit,
 ) {
-    var sliderPosition by remember { mutableStateOf(frameRate.toFloat()) }
-
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -250,17 +232,6 @@ fun CameraView(
             )
             Text(text = "Audio Enabled")
         }
-        Spacer(modifier = Modifier.height(16.dp))
-        Text(text = "Frame Rate: ${sliderPosition.toInt()} FPS")
-        Slider(
-            value = sliderPosition,
-            onValueChange = {
-                sliderPosition = it
-                onFrameRateChange(it.toInt())
-            },
-            valueRange = 1f..60f,
-            steps = 59 // Number of steps between min and max values
-        )
     }
 }
 

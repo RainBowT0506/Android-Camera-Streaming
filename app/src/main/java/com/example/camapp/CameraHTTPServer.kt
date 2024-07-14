@@ -92,6 +92,61 @@ class CameraHttpServer(private val context: Context) : NanoHTTPD(8080) {
         frameProducerThread = null
     }
 
+    private fun setZoom(zoomLevelStr: String?): NanoHTTPD.Response{
+        if (zoomLevelStr != null) {
+            try {
+                val zoomLevel = zoomLevelStr.toFloat()
+                if (zoomLevel in 0.0f..1.0f) {
+                    // Set zoom level in CameraService
+                    cameraService?.setZoom(zoomLevel)
+                    return newFixedLengthResponse(Response.Status.OK, NanoHTTPD.MIME_PLAINTEXT, "Zoom level set to $zoomLevel")
+                } else {
+                    return newFixedLengthResponse(Response.Status.BAD_REQUEST, NanoHTTPD.MIME_PLAINTEXT, "Invalid zoom level")
+                }
+            } catch (e: NumberFormatException) {
+                return newFixedLengthResponse(Response.Status.BAD_REQUEST, NanoHTTPD.MIME_PLAINTEXT, "Invalid zoom level format")
+            }
+        } else {
+            return newFixedLengthResponse(Response.Status.BAD_REQUEST, NanoHTTPD.MIME_PLAINTEXT, "Missing zoom level parameter")
+        }
+    }
+
+    private fun setFps(fpsStr: String?): NanoHTTPD.Response {
+        if (fpsStr != null) {
+            try {
+                val fps = fpsStr.toInt()
+                if (fps in 5..30) {
+                    // Set frame rate in CameraService
+                    setFrameRate(fps)
+                    return newFixedLengthResponse(
+                        Response.Status.OK,
+                        NanoHTTPD.MIME_PLAINTEXT,
+                        "Frame rate set to $fps FPS"
+                    )
+                } else {
+                    return newFixedLengthResponse(
+                        Response.Status.BAD_REQUEST,
+                        NanoHTTPD.MIME_PLAINTEXT,
+                        "Invalid frame rate: must be between 1 and 30"
+                    )
+                }
+            } catch (e: NumberFormatException) {
+                return newFixedLengthResponse(
+                    Response.Status.BAD_REQUEST,
+                    NanoHTTPD.MIME_PLAINTEXT,
+                    "Invalid frame rate format"
+                )
+            }
+        } else {
+            return newFixedLengthResponse(
+                Response.Status.BAD_REQUEST,
+                NanoHTTPD.MIME_PLAINTEXT,
+                "Missing frame rate parameter"
+            )
+        }
+    }
+
+
     override fun serve(session: NanoHTTPD.IHTTPSession): NanoHTTPD.Response {
         Log.d("CameraHttpServer", "Request received: ${session.uri}")
         return when (session.uri) {
@@ -125,22 +180,11 @@ class CameraHttpServer(private val context: Context) : NanoHTTPD(8080) {
             }
             "/setZoom" -> {
                 val zoomLevelStr = session.parameters["zoomLevel"]?.firstOrNull()
-                if (zoomLevelStr != null) {
-                    try {
-                        val zoomLevel = zoomLevelStr.toFloat()
-                        if (zoomLevel in 0.0f..1.0f) {
-                            // Set zoom level in CameraService
-                            cameraService?.setZoom(zoomLevel)
-                            newFixedLengthResponse(Response.Status.OK, NanoHTTPD.MIME_PLAINTEXT, "Zoom level set to $zoomLevel")
-                        } else {
-                            newFixedLengthResponse(Response.Status.BAD_REQUEST, NanoHTTPD.MIME_PLAINTEXT, "Invalid zoom level")
-                        }
-                    } catch (e: NumberFormatException) {
-                        newFixedLengthResponse(Response.Status.BAD_REQUEST, NanoHTTPD.MIME_PLAINTEXT, "Invalid zoom level format")
-                    }
-                } else {
-                    newFixedLengthResponse(Response.Status.BAD_REQUEST, NanoHTTPD.MIME_PLAINTEXT, "Missing zoom level parameter")
-                }
+                setZoom(zoomLevelStr)
+            }
+            "/setFPS" -> {
+                val fpsStr = session.parameters["fps"]?.firstOrNull()
+                setFps(fpsStr)
             }
             else -> {
                 newFixedLengthResponse(Response.Status.NOT_FOUND, NanoHTTPD.MIME_PLAINTEXT, "Not Found")

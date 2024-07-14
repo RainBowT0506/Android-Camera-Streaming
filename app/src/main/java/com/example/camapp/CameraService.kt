@@ -17,7 +17,6 @@ import java.util.concurrent.Executors
 
 class CameraService : LifecycleService() {
     private var cameraExecutor = Executors.newSingleThreadExecutor()
-    private var frameRate = 30 // Default frame rate
     private lateinit var cameraControl: CameraControl // CameraControl reference
     private lateinit var cameraInfo: CameraInfo // CameraInfo reference
 
@@ -28,10 +27,6 @@ class CameraService : LifecycleService() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        frameRate = intent?.getIntExtra("frameRate", 30) ?: 30
-        val zoomLevel = intent?.getFloatExtra("zoomLevel", 1.0f) ?: 1.0f
-        setZoom(zoomLevel)
-        setFrameRate(frameRate)
         return super.onStartCommand(intent, flags, startId)
     }
 
@@ -69,13 +64,6 @@ class CameraService : LifecycleService() {
         } else {
             Log.e("CameraService", "Camera control is not initialized.")
         }
-    }
-
-    fun setFrameRate(newFrameRate: Int) {
-        frameRate = newFrameRate
-        // Reconfigure the imageAnalysis or any relevant components with new frame rate
-        // For simplicity, let's just print the frame rate change for now
-        Log.d("CameraService", "Frame rate set to $frameRate FPS")
     }
 
     private fun startCamera() {
