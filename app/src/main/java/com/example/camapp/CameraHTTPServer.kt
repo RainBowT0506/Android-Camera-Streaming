@@ -1,6 +1,7 @@
 package com.example.camapp
 
 import android.content.Context
+import android.os.BatteryManager
 import android.util.Log
 import fi.iki.elonen.NanoHTTPD
 import java.io.ByteArrayInputStream
@@ -144,7 +145,10 @@ class CameraHttpServer(private val context: Context) : NanoHTTPD(8080) {
             )
         }
     }
-
+    private fun getBatteryLevel(): Int {
+        val batteryManager = context.getSystemService(Context.BATTERY_SERVICE) as BatteryManager
+        return batteryManager.getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY)
+    }
 
     override fun serve(session: NanoHTTPD.IHTTPSession): NanoHTTPD.Response {
         Log.d("CameraHttpServer", "Request received: ${session.uri}")
@@ -184,6 +188,10 @@ class CameraHttpServer(private val context: Context) : NanoHTTPD(8080) {
             "/setFPS" -> {
                 val fpsStr = session.parameters["fps"]?.firstOrNull()
                 setFps(fpsStr)
+            }
+            "/battery" -> {
+                val batteryLevel = getBatteryLevel()
+                newFixedLengthResponse(Response.Status.OK, NanoHTTPD.MIME_PLAINTEXT, "$batteryLevel")
             }
             else -> {
                 newFixedLengthResponse(Response.Status.NOT_FOUND, NanoHTTPD.MIME_PLAINTEXT, "Not Found")
