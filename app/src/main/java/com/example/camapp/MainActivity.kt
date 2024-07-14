@@ -1,9 +1,13 @@
 package com.example.camapp
 
 import android.Manifest
+import android.content.ComponentName
+import android.content.Context
 import android.content.Intent
+import android.content.ServiceConnection
 import android.content.pm.PackageManager
 import android.os.Bundle
+import android.os.IBinder
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -21,11 +25,11 @@ class MainActivity : ComponentActivity() {
     private var server: CameraHttpServer? = null
     private var serverStatus by mutableStateOf("Server not started")
     private var serverIp by mutableStateOf("")
-    private var cameraEnabled by mutableStateOf(true)
-    private var serverEnabled by mutableStateOf(false)
+    private var cameraEnabled by mutableStateOf(false)
+    private var serverEnabled by mutableStateOf(true)
     private var audioEnabled by mutableStateOf(false) // Flag for AudioService
-    private var frameRate by mutableStateOf(30) // Default frame rate
-
+    private var frameRate by mutableStateOf(10) // Default frame rate
+    private var cameraServiceConnection: ServiceConnection? = null
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
@@ -37,8 +41,8 @@ class MainActivity : ComponentActivity() {
                             CameraView(
                                 serverStatus = serverStatus,
                                 serverIp = serverIp,
-                                cameraEnabled = cameraEnabled,
                                 serverEnabled = serverEnabled,
+                                cameraEnabled = cameraEnabled,
                                 audioEnabled = audioEnabled,
                                 frameRate = frameRate,
                                 onCameraToggle = { enabled ->
@@ -110,17 +114,40 @@ class MainActivity : ComponentActivity() {
         serverStatus = "Server stopped"
         serverIp = ""
         server = null
+        stopCameraService()
+        stopAudioService()
     }
 
     private fun startCameraService() {
         val serviceIntent = Intent(this, CameraService::class.java)
         serviceIntent.putExtra("frameRate", frameRate)
+        serviceIntent.putExtra("zoomLevel", 0f)
         ContextCompat.startForegroundService(this, serviceIntent)
+        bindCameraService()
     }
 
     private fun stopCameraService() {
+        cameraEnabled = false
         val serviceIntent = Intent(this, CameraService::class.java)
         stopService(serviceIntent)
+    }
+
+    private fun bindCameraService() {
+        val serviceIntent = Intent(this, CameraService::class.java)
+        cameraServiceConnection = object : ServiceConnection {
+            override fun onServiceConnected(className: ComponentName?, service: IBinder?) {
+                val binder = service as CameraService.LocalBinder
+                val cameraService = binder.getService()
+                // Assign the cameraService to your server
+                server?.cameraService = cameraService
+            }
+
+            override fun onServiceDisconnected(arg0: ComponentName?) {
+                // Handle disconnection
+                server?.cameraService = null
+            }
+        }
+        bindService(serviceIntent, cameraServiceConnection!!, Context.BIND_AUTO_CREATE)
     }
 
     private fun startAudioService() {
@@ -129,13 +156,15 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun stopAudioService() {
+        audioEnabled = false
         val serviceIntent = Intent(this, AudioService::class.java)
         stopService(serviceIntent)
     }
 
     private fun updateCameraState(enabled: Boolean) {
-        if (enabled) {
-            if (serverEnabled) startCameraService()
+        cameraEnabled = enabled
+        if (enabled && serverEnabled) {
+            startCameraService()
         } else {
             stopCameraService()
         }
@@ -143,18 +172,16 @@ class MainActivity : ComponentActivity() {
 
     private fun updateServerState(enabled: Boolean) {
         serverEnabled = enabled
-        if (enabled && cameraEnabled) {
+        if (enabled) {
             startServer()
-            startCameraService()
         } else {
             stopServer()
-            stopCameraService()
         }
     }
 
     private fun updateAudioState(enabled: Boolean) {
         audioEnabled = enabled
-        if (enabled) {
+        if (enabled && serverEnabled) {
             startAudioService()
         } else {
             stopAudioService()
@@ -170,8 +197,6 @@ class MainActivity : ComponentActivity() {
     override fun onDestroy() {
         super.onDestroy()
         stopServer()
-        stopCameraService()
-        stopAudioService()
     }
 }
 
@@ -201,20 +226,20 @@ fun CameraView(
         Spacer(modifier = Modifier.height(16.dp))
         Row(verticalAlignment = Alignment.CenterVertically) {
             Switch(
-                checked = cameraEnabled,
-                onCheckedChange = { onCameraToggle(it) },
-                modifier = Modifier.padding(end = 8.dp)
-            )
-            Text(text = "Camera Enabled")
-        }
-        Spacer(modifier = Modifier.height(8.dp))
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Switch(
                 checked = serverEnabled,
                 onCheckedChange = { onServerToggle(it) },
                 modifier = Modifier.padding(end = 8.dp)
             )
             Text(text = "Server Enabled")
+        }
+        Spacer(modifier = Modifier.height(8.dp))
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Switch(
+                checked = cameraEnabled,
+                onCheckedChange = { onCameraToggle(it) },
+                modifier = Modifier.padding(end = 8.dp)
+            )
+            Text(text = "Camera Enabled")
         }
         Spacer(modifier = Modifier.height(8.dp))
         Row(verticalAlignment = Alignment.CenterVertically) {

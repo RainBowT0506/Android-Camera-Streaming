@@ -1,6 +1,7 @@
 package com.example.camapp
 
 import android.content.Context
+import android.util.Log
 import fi.iki.elonen.NanoHTTPD
 import java.io.ByteArrayInputStream
 import java.util.concurrent.BlockingQueue
@@ -16,6 +17,7 @@ private val INDEX_HTML = """
     <style>
         body {
             display: flex;
+            flex-direction: column;
             justify-content: center;
             align-items: center;
             height: 100vh;
@@ -23,24 +25,35 @@ private val INDEX_HTML = """
         }
         img {
             width: auto;
-            height: 100%;
+            height: 70%;
+        }
+        input[type="range"] {
+            width: 80%;
         }
     </style>
 </head>
 <body>
     <img src="/stream" />
-    <audio id="audioPlayer" controls autoplay></audio>
+    <input type="range" min="0" max="100" value="0" id="zoomSlider">
     <script>
-        var audioPlayer = document.getElementById('audioPlayer');
-        audioPlayer.src = "/audio"; // Set the audio source directly to /audio endpoint
+        var zoomSlider = document.getElementById('zoomSlider');
+        zoomSlider.oninput = function() {
+            fetch(`/setZoom?zoomLevel=${"$"}{this.value / 100}`).then(response => {
+                console.log(response.text());
+            }).catch(error => {
+                console.error('Error:', error);
+            });
+        }
     </script>
 </body>
 </html>
 """.trimIndent()
 
 class CameraHttpServer(private val context: Context) : NanoHTTPD(8080) {
+    var cameraService: CameraService? = null
+
     @Volatile
-    private var frameRate: Int = 30 // Default frame rate
+    private var frameRate: Int = 10 // Default frame rate
     private val frameQueue: BlockingQueue<ByteArray> = LinkedBlockingQueue()
 
     private var frameProducerThread: Thread? = null
@@ -80,6 +93,7 @@ class CameraHttpServer(private val context: Context) : NanoHTTPD(8080) {
     }
 
     override fun serve(session: NanoHTTPD.IHTTPSession): NanoHTTPD.Response {
+        Log.d("CameraHttpServer", "Request received: ${session.uri}")
         return when (session.uri) {
             "/" -> {
                 newFixedLengthResponse(Response.Status.OK, "text/html", INDEX_HTML)
@@ -107,6 +121,25 @@ class CameraHttpServer(private val context: Context) : NanoHTTPD(8080) {
                     }
                 } else {
                     newFixedLengthResponse(Response.Status.NOT_FOUND, NanoHTTPD.MIME_PLAINTEXT, "No audio data available")
+                }
+            }
+            "/setZoom" -> {
+                val zoomLevelStr = session.parameters["zoomLevel"]?.firstOrNull()
+                if (zoomLevelStr != null) {
+                    try {
+                        val zoomLevel = zoomLevelStr.toFloat()
+                        if (zoomLevel in 0.0f..1.0f) {
+                            // Set zoom level in CameraService
+                            cameraService?.setZoom(zoomLevel)
+                            newFixedLengthResponse(Response.Status.OK, NanoHTTPD.MIME_PLAINTEXT, "Zoom level set to $zoomLevel")
+                        } else {
+                            newFixedLengthResponse(Response.Status.BAD_REQUEST, NanoHTTPD.MIME_PLAINTEXT, "Invalid zoom level")
+                        }
+                    } catch (e: NumberFormatException) {
+                        newFixedLengthResponse(Response.Status.BAD_REQUEST, NanoHTTPD.MIME_PLAINTEXT, "Invalid zoom level format")
+                    }
+                } else {
+                    newFixedLengthResponse(Response.Status.BAD_REQUEST, NanoHTTPD.MIME_PLAINTEXT, "Missing zoom level parameter")
                 }
             }
             else -> {
