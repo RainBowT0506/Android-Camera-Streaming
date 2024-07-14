@@ -53,7 +53,7 @@ class CameraHttpServer(private val context: Context) : NanoHTTPD(8080) {
     var cameraService: CameraService? = null
 
     @Volatile
-    private var frameRate: Int = 10 // Default frame rate
+    private var frameRate: Int = 30 // Default frame rate
     private val frameQueue: BlockingQueue<ByteArray> = LinkedBlockingQueue()
 
     private var frameProducerThread: Thread? = null
@@ -116,7 +116,6 @@ class CameraHttpServer(private val context: Context) : NanoHTTPD(8080) {
             try {
                 val fps = fpsStr.toInt()
                 if (fps in 5..30) {
-                    // Set frame rate in CameraService
                     setFrameRate(fps)
                     return newFixedLengthResponse(
                         Response.Status.OK,

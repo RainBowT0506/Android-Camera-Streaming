@@ -25,7 +25,7 @@ class MainActivity : ComponentActivity() {
     private var server: CameraHttpServer? = null
     private var serverStatus by mutableStateOf("Server not started")
     private var serverIp by mutableStateOf("")
-    private var cameraEnabled by mutableStateOf(false)
+    private var cameraEnabled by mutableStateOf(true)
     private var serverEnabled by mutableStateOf(true)
     private var audioEnabled by mutableStateOf(false) // Flag for AudioService
     private var cameraServiceConnection: ServiceConnection? = null
