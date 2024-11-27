@@ -66,28 +66,62 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun requestPermissions() {
-        val requestPermissionLauncher =
+        requestCameraPermission()
+        requestAudioPermission()
+    }
+
+    private fun requestCameraPermission() {
+        val cameraPermissionLauncher =
             registerForActivityResult(ActivityResultContracts.RequestPermission()) { isGranted: Boolean ->
                 if (isGranted) {
+                    // Camera permission granted, start the camera and server if enabled
                     if (serverEnabled) startServer()
                     if (cameraEnabled) startCameraService()
-                    if (audioEnabled) startAudioService()
                 } else {
-                    // Handle permission denied case
+                    // Handle camera permission denied
                 }
             }
 
         when {
+            // Check if camera permission is already granted
             ContextCompat.checkSelfPermission(
                 this,
                 Manifest.permission.CAMERA
             ) == PackageManager.PERMISSION_GRANTED -> {
                 if (serverEnabled) startServer()
                 if (cameraEnabled) startCameraService()
+            }
+
+            else -> {
+                // Request camera permission
+                cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
+            }
+        }
+    }
+
+    private fun requestAudioPermission() {
+        val audioPermissionLauncher =
+            registerForActivityResult(ActivityResultContracts.RequestPermission()) { isGranted: Boolean ->
+                if (isGranted) {
+                    // Audio permission granted, start the audio service if enabled
+                    if (audioEnabled) startAudioService()
+                } else {
+                    // Handle audio permission denied
+                }
+            }
+
+        when {
+            // Check if audio permission is already granted
+            ContextCompat.checkSelfPermission(
+                this,
+                Manifest.permission.RECORD_AUDIO
+            ) == PackageManager.PERMISSION_GRANTED -> {
                 if (audioEnabled) startAudioService()
             }
+
             else -> {
-                requestPermissionLauncher.launch(Manifest.permission.CAMERA)
+                // Request audio permission
+                audioPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
             }
         }
     }
